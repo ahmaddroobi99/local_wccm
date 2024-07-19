@@ -4,8 +4,6 @@ if any(any(isnan(m)))
     m(isnan(m)) = 0;
     T = table; 
 end
- 
-
 casestr = casename(pin.N, pin.Ltracers, pin.sigmax, pin.Tend, pin.spectrum_type, pin.damping_type, pin.dtsave);
 
 N = pin.computed.N;
@@ -248,6 +246,7 @@ for jj = 1:length(taveidx)
     set(ch, 'Position', [0.94 0.1100 0.014 0.7150]);
     set(s3,'position',s3Pos);
     suptitle('total energy spectrum')
+    
     drawnow;
     if fsavefigs
         resizefonts(handle);
@@ -286,14 +285,12 @@ for jj = 1:length(taveidx)
         export_fig(fullfile(figfolder, sprintf('rmsxcorr-decorf%i',tdecorfactor(jj))), '-q101','-p.01','-m1','-pdf');
         savefig(handle, fullfile(figfolder, sprintf('rmsxcorr-decorf%i.fig',tdecorfactor(jj))),'compact')
     end
-        
     %-------------------------------------------------------------------------%
     % plot true and recovered velocity field and streamlines together
     %-------------------------------------------------------------------------%
     handle = figure(5); clf
     set(gcf,'Position',[440 486 724 346]);
     set(handle,'Color','w');
-    
     XX = zeros(2, n_tsave);
     for i = 1:length(plot_time)
         clf;

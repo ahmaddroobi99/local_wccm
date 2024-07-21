@@ -421,7 +421,3 @@ function T = analysis(pin, opts, m, qhc, Xt)
     %     end
     
 end
-
-sigma_o = pin.sigmax;
-tmax = tsave(end);
-T = table(N,rms_ave,nrms_ave,xcor_ave,sigma_o,dtsave,tmax,Ltracers);

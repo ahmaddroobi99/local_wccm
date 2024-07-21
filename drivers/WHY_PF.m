@@ -1,9 +1,5 @@
 
 function [pin, m, Xt] = LDA_ENKF_QG(pin)
-    % LDA_ENKF_QG: Implementation of the Ensemble Kalman Filter (EnKF)
-    % for Lagrangian Data Assimilation in the Quasi-Geostrophic (QG) model.
-
-    % Extract input parameters
     Tend = pin.Tend;
     damping_type = pin.damping_type;  
     d = pin.d;
@@ -11,15 +7,13 @@ function [pin, m, Xt] = LDA_ENKF_QG(pin)
     spectrum_type = pin.spectrum_type;
     E0 = pin.E0;   
     num_modes_flat = 2;
-    sigmax = 0.1; % Standard deviation of observation noise
+    sigmax = 0.1;
     Ltracers = pin.Ltracers;
     N = pin.N; 
     dt = pin.dt;
     dtsave = pin.dtsave;
     fsavedata = pin.fsavedata; 
     datafolder = pin.datafolder;
-
-    % Setup simulation parameters
     t = 0:dt:Tend+dt;
     n_t = length(t);
     dtsave = round(dtsave/dt)*dt; % Round to a multiple of dt
@@ -27,26 +21,21 @@ function [pin, m, Xt] = LDA_ENKF_QG(pin)
     tsave = t(1:nsavef:length(t));
     n_tsave = length(tsave);
 
-    fprintf('Total modes (2*N+1) = %i^2, max wavenumber resolved %d\n', N, N/2-1);
     Ntotal = N*N;
-
-    % QG parameters
-    qlim = 1.5E5; % if any q > qlim, simulation stops
+    qlim = 1.5E5; 
     beta = 0.05;
     dd = 5E-3;
-
     epsf = 0;
-    kf = 50;  % no effect since epsf = 0
-    sigf = 1; % no effect since epsf = 0
-    alpf = 0; % no effect since epsf = 0
+    kf = 50;  
+    sigf = 1; 
+    alpf = 0; 
     tau0 = 0.04;
-    tdel = 0; % no effect for sin forcing
+    tdel = 0; 
     forcing_type = 'sin';
-
     Nt = 2e5;
-    % Set physical parameters
-    sh = 8; % hyperdiffusion exponent (needs to be even)
-    if N == 8
+    sh = 8;
+    
+    if N == 16
         if epsf == 0
             nu = 2.5e-28 *(50/50)^(-2*sh+2/3); %5E-33; % Coefficient of biharmonic vorticity diffusion
         else
@@ -60,18 +49,14 @@ function [pin, m, Xt] = LDA_ENKF_QG(pin)
     elseif N == 512
         nu = 1E-34 *(kf/50)^(-2*sh+2/3);
     end
-
-    % Put useful stuff into a struct    
     params = struct('beta', beta, 'sh', sh, 'dd', dd,'N', N, 'nu', nu, ...
                     'kf', kf, 'epsf', epsf, 'sigf', sigf, 'alpf', alpf, ...
                     'tau0', tau0, 'tdel', tdel, 'forcingtype', forcing_type);
-
-    F = 0; % zero forcing or periodic forcing only (not tested)
-
-    % Setup grid and wave vectors
+   
     L = 2*pi;
     x = L/N*(0:N-1)'; % x coordinate
     y = L/N*(0:N-1)'; % y coordinate
+    
     [xx, yy] = meshgrid(x, y); % xy grid
 
     kx = [0:N/2-1 0 -N/2+1:-1]; % x wave vector
@@ -84,7 +69,6 @@ function [pin, m, Xt] = LDA_ENKF_QG(pin)
     projx(zeromodes2d(N)) = 0;
     projy(zeromodes2d(N)) = 0;
 
-    % Determine gamma based on damping type
     if strcmp(damping_type, 'scaledep')
         gamma = (d + mu * knorm.^2);
     elseif strcmp(damping_type, 'unif')
@@ -93,7 +77,6 @@ function [pin, m, Xt] = LDA_ENKF_QG(pin)
         error('Unknown damping type')
     end
 
-    % Determine sigma based on spectrum type
     if strcmp(spectrum_type, 'kolmo')
         sigma = sqrt(2 * gamma .* (E0 * knorm.^(-5/3)) ./ knorm);
     elseif strcmp(spectrum_type, 'com_kolmo')
@@ -129,7 +112,6 @@ function [pin, m, Xt] = LDA_ENKF_QG(pin)
                   'x', x, 'y', y, 'kx', kx, 'ky', ky, 'kxx', kxx, 'kyy', kyy);
     pin.computed = pout;
 
-% Initial ensemble setup
 ensemble_size = 10;
 mprev = zeros(N*N, 1);
 particles = mvnrnd(mprev', eye(N*N), ensemble_size)';
@@ -138,22 +120,18 @@ m = zeros(N*N, n_tsave); % Array to store the results
 X = cell2mat(pin.X);     % Observation matrix
 dXdt = [(X(:,2)-X(:,1)) (X(:,2:end) - X(:,1:end-1))]./dt;
 
-timer = tic;             % Start timer
 Px = zeros(2 * Ltracers, N * N); % Matrix for projections
 is = 1;
 
-% Main Loop
 for i = 1:n_t
-    % Compute projection matrix Px
+
     for n = 1:Ltracers
         Xh = exp(1i * (kxx * X((n-1)*2 + 1, i) + kyy * X((n-1)*2 + 2, i)));
         Px((n-1)*2 + 1, :) = reshape(Xh .* projx, 1, []);
         Px((n-1)*2 + 2, :) = reshape(Xh .* projy, 1, []);
     end
 
-    % Propagate each particle using QG dynamics
     parfor j = 1:ensemble_size  % Parallelized for better performance
-        % Perform QG dynamics update for q using the QG solver
         q_next = QG_dynamics(reshape(particles(:, j), N, N), dt, params);
         particles(:, j) = reshape(q_next, [], 1);
     end
@@ -183,20 +161,9 @@ for i = 1:n_t
         is = is + 1;
         m(:, is) = particles_mean;
     end
-
-    % Check for NaN values
-    if any(isnan(m(:)))
-        fprintf('NaN in m detected at iteration %d!\n', i);
-        keyboard;
-    end
 end
 
-fprintf('Filter time %s\n', time2str(toc(timer)));
-
-
-  % Save only dt_save time steps
     Xt = X(:, 1:nsavef:length(t)); 
-
     casestr = casename(pin.N, pin.Ltracers, sigmax, pin.Tend, pin.spectrum_type, pin.damping_type, pin.dtsave);
     datafolder = fullfile(datafolder, casestr);
 
@@ -205,18 +172,17 @@ fprintf('Filter time %s\n', time2str(toc(timer)));
     end
 
     if fsavedata
-        save(fullfile(datafolder, 'qqqqqqq_data.mat'), 'm', 'Xt', 'pin', '-v7.3')
+        save(fullfile(datafolder, 'qg_wccm.mat'), 'm', 'Xt', 'pin', '-v7.3')
     end
 end
 
-% Function to compute QG dynamics
 function q_next = QG_dynamics(q, dt, params)
+ 
     N = params.N;
     tauk = compute_tauk(params, size(q));
-
-    % Set up hyperviscous PV dissipation and linear damping
     k = [0:N/2 -N/2+1:-1]'; % wavenumbers
     LL = zeros(N, N);
+    
     for jj = 1:N
         for ii = 1:N
             kr = sqrt(k(ii)^2 + k(jj)^2);
@@ -224,7 +190,6 @@ function q_next = QG_dynamics(q, dt, params)
         end
     end
 
-    % Initialize
     M = 1 ./ (1 - .25 * dt * LL);
 
     % First stage ARK4
@@ -257,8 +222,7 @@ function q_next = QG_dynamics(q, dt, params)
     l5 = LL .* q5;
 
     % Successful step, proceed to evaluation
-    q_next = real(ifft2(q + dt * (0.1579162951616714 * (k0 + l0) + 0.1867589405240008 * (k2 + l2) + 0.6805652953093346 * (k3 + l3) - 0.2752405309950067 * (k4 + l4) + (k5 + l5) / 4)));
-    q_next = fft2(q_next);
+    q_next = ifft2(q + dt * (0.1579162951616714 * (k0 + l0) + 0.1867589405240008 * (k2 + l2) + 0.6805652953093346 * (k3 + l3) - 0.2752405309950067 * (k4 + l4) + (k5 + l5) / 4));
 end
 
 function tauk = compute_tauk(params, q_size)

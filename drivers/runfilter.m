@@ -18,9 +18,12 @@
     if isempty(obsdatafile)
         error('obs data not found');
     end
+
     obsdata = load(fullfile(obsdatafile.folder,obsdatafile.name));
-    pin.Tend = t(end);
+    % pin.Tend = t(end);
+
     pin.Tend = 30;
+    pin.nt=pin.Tend\dt;
     pin.Ltracers = Ltracers;
     pin.N = 16; % Grid points in each dimension (must be even)
     pin.X = obsdata.X;
@@ -61,4 +64,4 @@
     opts.renderer = 'zbuffer';
     opts.plot_times = [0:1:30];
     opts.fsavefigs = true;
-    y_ans(pin, opts, m, qhc, Xt);
+    analysis(pin, opts, m, qhc, Xt);

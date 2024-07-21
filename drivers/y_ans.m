@@ -158,7 +158,7 @@ function T = analysis(pin, opts, m, qhc, Xt)
        xcor_ave = mean(xcor(2:end));
        xcor_mode_ave = mean(xcor_mode,2);
        [xcor_mode_ave_omni, knormf] = omnidirectional_sum(xcor_mode_ave);
-       handle = figure(3); clf;
+       handle = figure(2); clf;
        set(handle,'Color','w');
     
         yyaxis left
@@ -306,7 +306,7 @@ function T = analysis(pin, opts, m, qhc, Xt)
         export_fig(fullfile(figfolder, sprintf('rmsxcorr-decorf%i',tdecorfactor(jj))), '-q101','-p.01','-m1','-pdf');
         savefig(handle, fullfile(figfolder, sprintf('rmsxcorr-decorf%i.fig',tdecorfactor(jj))),'compact')
     end
-    handle = figure(5); clf
+    handle = figure(6); clf
     set(gcf,'Position',[440 486 724 346]);
     set(handle,'Color','w');
     

@@ -1,5 +1,6 @@
 function [pin, m, Xt] = LDA_ENKF_QG_localization(pin)
- % Extract input parameters
+
+    % Extract input parameters
 
     Tend = pin.Tend;
     damping_type = pin.damping_type;  
@@ -7,7 +8,7 @@ function [pin, m, Xt] = LDA_ENKF_QG_localization(pin)
     mu = pin.mu;
     spectrum_type = pin.spectrum_type;
     E0 = pin.E0;   
-    num_modes_flat = 1;
+    num_modes_flat = 2;
     N = pin.N; 
     dt = pin.dt;
     dtsave = pin.dtsave;
@@ -43,7 +44,16 @@ function [pin, m, Xt] = LDA_ENKF_QG_localization(pin)
     L = 2*pi;
     x = L/N*(0:N-1)';
     y = L/N*(0:N-1)';
-    [knorm,kx,ky,kxx, kyy, projx, projy] = setup_wave_vectors(N, x, y, d, mu,damping_type, spectrum_type, E0, num_modes_flat);
+
+    [xx, yy] = meshgrid(x, y);
+    kx = [0:N/2-1 0 -N/2+1:-1];
+    ky = [0:N/2-1 0 -N/2+1:-1];
+    [kxx, kyy] = meshgrid(kx, ky);
+    knorm = hypot(kxx, kyy);
+    projx = (1i * -kyy ./ knorm);
+    projy = (1i * kxx ./ knorm);
+    projx(zeromodes2d(N)) = 0;
+    projy(zeromodes2d(N)) = 0;
 
     gamma = calculate_gamma(N,d, mu, knorm, damping_type);
     sigma = calculate_sigma(N,gamma, knorm, E0, spectrum_type, num_modes_flat);
@@ -59,68 +69,78 @@ function [pin, m, Xt] = LDA_ENKF_QG_localization(pin)
 
     pin.computed = struct('tsave', tsave, 'dtsave', dtsave, 'N', N, 'Ntotal', Ntotal,'gamma',gamma,'sigma',sigma,'Sigma'...
         ,Sigma,'Gamma',Gamma,'x', x, 'y', y, 'kx', kx, 'ky', ky, 'kxx', kxx, 'kyy', kyy);
-
-
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
 % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
-% EnKF
+% EnKF Implementation for QG Model with Tracer Update
 % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
 
+ensemble_size = 50; % Increased ensemble size for better state representation
+N = pin.N; % Number of grid points in each dimension
+mprev = zeros(N*N, 1); % Initial mean state (assumed to be zero)
+X_ens = mvnrnd(mprev', eye(N*N), ensemble_size)'; % Initial ensemble generation
 
+m = zeros(N*N, numel(tsave)); % Array to store the results
+X = cell2mat(pin.X); % Observation matrix
+dXdt = [(X(:,2)-X(:,1)) (X(:,2:end) - X(:,1:end-1))]./dt;
+Ltracers = 20;
 
-    ensemble_size = 50; % Increased ensemble size for better state representation
-    mprev = zeros(N*N, 1);
-    X_ens = mvnrnd(mprev', eye(N*N), ensemble_size)'; % Initial ensemble
-    m = zeros(N*N, numel(tsave)); % Array to store the results
-    X = cell2mat(pin.X); % Observation matrix
-    dXdt = diff(X, 1, 2) / pin.dt;
-    dXdt = [dXdt, dXdt(:,end)];
-    dt= 0.00001;
+Px = zeros(2 * pin.Ltracers, N * N); % Matrix for projections
+pin.nt = pin.Tend / pin.dt; % Total number of time steps
 
-    Px = zeros(2 * pin.Ltracers, N * N); % Matrix for projections
-    pin.nt = pin.Tend / pin.dt;
-    for i = 1:pin.nt
+% Loop over time steps
+for i = 1:pin.nt
 
-        for n = 1:pin.Ltracers
-        
+    % Check variable types
+    if ~isnumeric(kxx) || ~isnumeric(kyy)
+        error('kxx and kyy must be numeric arrays.');
+    end
+
+    % Update projection matrix Px
+    for n = 1:Ltracers
         Xh = exp(1i*(kxx*X((n-1)*2 + 1, i) + kyy*X((n-1)*2 + 2, i)));
         x1 = Xh.*projx;
         x2 = Xh.*projy;
         Px((n-1)*2 + 1,:) = x1(:).';
         Px((n-1)*2 + 2,:) = x2(:).';
-        
-        end
-
-        [X_ens, X_mean] = enkf_update(X_ens, dXdt(:, i), Px, pin.sigmax, ensemble_size, N);
-
-        % QG Dynamics Forecast for the ensemble
-        for j = 1:ensemble_size
-            q_next = QG_dynamics(reshape(X_ens(:, j), N, N), pin.dt, params);
-            X_ens(:, j) = q_next(:);
-        end
-        X_ens_reshaped = mean(X_ens, 2);
-        if mod(i, nsavef) == 0
-            m(:, floor(i / nsavef) + 1) = X_ens_reshaped;
-        end
-    end
-    
-    Xt = X(:, 1:nsavef:length(pin.tlen));
-    casestr = casename(pin.N, pin.Ltracers, pin.sigmax, pin.Tend, pin.spectrum_type, pin.damping_type, pin.dtsave);
-    datafolder = fullfile(pin.datafolder, casestr);
-
-    if pin.fsavedata && ~isfolder(datafolder)
-        mkdir(datafolder);
     end
 
-    if pin.fsavedata
-        save(fullfile(datafolder, 'qgahmad_data.mat'), 'm', 'Xt', 'pin', '-v7.3');
+    % QG Dynamics Forecast for the ensemble
+    for j = 1:ensemble_size
+        q_next = QG_dynamics(reshape(X_ens(:, j), N, N), pin.dt, params);
+        X_ens(:, j) = q_next(:);
     end
 
+    % EnKF update
+    [X_ens, X_mean] = enkf_update(X_ens, dXdt(:, i), Px, pin.sigmax, ensemble_size, N);
+
+    % Save mean state at specified intervals
+    if mod(i, nsavef) == 0
+        m(:, floor(i / nsavef) + 1) = X_mean;
+    end
+end
+
+Xt = X(:, 1:nsavef:length(pin.tlen)); % Extract the true states at save intervals
+
+% Create case string for saving data
+casestr = casename(pin.N, pin.Ltracers, pin.sigmax, pin.Tend, pin.spectrum_type, pin.damping_type, pin.dtsave);
+datafolder = fullfile(pin.datafolder, casestr); % Define data folder path
+
+% Save data if specified
+if pin.fsavedata && ~isfolder(datafolder)
+    mkdir(datafolder);
+end
+
+if pin.fsavedata
+    save(fullfile(datafolder, 'qgahmad_data.mat'), 'm', 'Xt', 'pin', '-v7.3');
+end
 end
 
 function q_next = QG_dynamics(q, dt, params)
+    dt = 0.00001; % Time step for QG dynamics
+
 
     N = params.N;
-    q_size= size(q);
+    q_size = size(q);
 
     [KX, KY] = meshgrid(0:q_size(1)-1, 0:q_size(2)-1);
     [X, Y] = meshgrid(-pi:2*pi/q_size(1):pi-2*pi/q_size(1), -pi:2*pi/q_size(2):pi-2*pi/q_size(2));
@@ -197,6 +217,7 @@ function [X_ens, X_mean] = enkf_update(X_ens, dXdt_i, Px, sigmax, ensemble_size,
     X_ens_diff = dXdt_i - Px * X_ens;
     X_ens = X_ens + K * X_ens_diff;
 
+
     % Recalculate ensemble mean after update
     X_mean = mean(X_ens, 2);
 
@@ -205,35 +226,35 @@ function [X_ens, X_mean] = enkf_update(X_ens, dXdt_i, Px, sigmax, ensemble_size,
     X_ens = X_mean + inflation_factor * (X_ens - X_mean);
 end
 
-function [knorm,kx,ky,kxx, kyy, projx, projy] = setup_wave_vectors(N, x, y, d, mu,damping_type, spectrum_type, E0, num_modes_flat)
+function [u, v] = interpolate_velocity(streamfunction, x, y, N)
 
-
-    [xx, yy] = meshgrid(x, y);
-    kx = [0:N/2-1 0 -N/2+1:-1];
-    ky = [0:N/2-1 0 -N/2+1:-1];
-    [kxx, kyy] = meshgrid(kx, ky);
-    knorm = hypot(kxx, kyy);
-    projx = (1i * -kyy ./ knorm);
-    projy = (1i * kxx ./ knorm);
-    projx(zeromodes2d(N)) = 0;
-    projy(zeromodes2d(N)) = 0;
+    % Reshape streamfunction to 2D
+    psi = reshape(streamfunction, N, N);
     
+    % Compute grid spacing
+    dx = 1 / (N - 1);
+    
+    % Compute grid indices
+    i = floor(x / dx) + 1;
+    j = floor(y / dx) + 1;
+    
+    % Ensure indices are within bounds
+    i = max(1, min(i, N-1));
+    j = max(1, min(j, N-1));
+    
+    % Interpolate streamfunction gradients
+    psi_x = (psi(i+1, j) - psi(i-1, j)) / (2*dx);
+    psi_y = (psi(i, j+1) - psi(i, j-1)) / (2*dx);
+    
+    % Compute velocities
+    u = -psi_y;
+    v = psi_x;
 end
 
-function Px = compute_projection_matrix(Px, kxx, kyy, projx, projy, X, Ltracers, i)
-
-    for n = 1:Ltracers
-
-        Xh = exp(1i*(kxx*X((n-1)*2 + 1, i) + kyy*X((n-1)*2 + 2, i)));
-        x1 = Xh.*projx;
-        x2 = Xh.*projy;
-        Px((n-1)*2 + 1,:) = x1(:).';
-        Px((n-1)*2 + 2,:) = x2(:).';
-    
-    end
 
 
-end
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
+
 
 function LL = compute_LL(N, k, nu, sh)
 
@@ -316,3 +337,5 @@ function nu = calculate_nu(N, kf, sh, epsf, tau0)
         nu = 1E-34 *(kf/50)^(-2*sh+2/3);
     end
 end
+
+

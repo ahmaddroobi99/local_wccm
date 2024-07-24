@@ -53,7 +53,7 @@
 
     timer = tic;
     display("WHY filter begins");
-    [pin, m, Xt] = WHY_FP(pin);
+    [pin, m, Xt] = where(pin);
     display("filter ends");
     fprintf('filter runtime  %s\n', time2str(toc(timer)));
     

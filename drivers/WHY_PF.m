@@ -226,7 +226,7 @@ function q_next = QG_dynamics(q, dt, params)
 end
 
 function tauk = compute_tauk(params, q_size)
-    % Compute the surface wind stress in spectral space
+
     [KX, KY] = meshgrid(0:q_size(1)-1, 0:q_size(2)-1);
     [X, Y] = meshgrid(-pi:2*pi/q_size(1):pi-2*pi/q_size(1), -pi:2*pi/q_size(2):pi-2*pi/q_size(2));
 

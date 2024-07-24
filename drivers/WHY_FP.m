@@ -1,6 +1,5 @@
 function [pin, m, Xt] = LDA_ENKF_QG_localization(pin)
 
-    % Extract input parameters
 
     Tend = pin.Tend;
     damping_type = pin.damping_type;  
@@ -38,8 +37,6 @@ function [pin, m, Xt] = LDA_ENKF_QG_localization(pin)
     sh = 8; % hyperdiffusion exponent (needs to be even)
     nu = calculate_nu(N, kf, sh, epsf, tau0);
 
-    
-
     % Setup grid and wave vectors
     L = 2*pi;
     x = L/N*(0:N-1)';
@@ -69,10 +66,10 @@ function [pin, m, Xt] = LDA_ENKF_QG_localization(pin)
 
     pin.computed = struct('tsave', tsave, 'dtsave', dtsave, 'N', N, 'Ntotal', Ntotal,'gamma',gamma,'sigma',sigma,'Sigma'...
         ,Sigma,'Gamma',Gamma,'x', x, 'y', y, 'kx', kx, 'ky', ky, 'kxx', kxx, 'kyy', kyy);
-% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
-% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
+
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 % EnKF Implementation for QG Model with Tracer Update
-% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
 
 ensemble_size = 50; % Increased ensemble size for better state representation
 N = pin.N; % Number of grid points in each dimension
@@ -90,28 +87,25 @@ pin.nt = pin.Tend / pin.dt; % Total number of time steps
 % Loop over time steps
 for i = 1:pin.nt
 
-    % Check variable types
-    if ~isnumeric(kxx) || ~isnumeric(kyy)
-        error('kxx and kyy must be numeric arrays.');
-    end
-
     % Update projection matrix Px
-    for n = 1:Ltracers
-        Xh = exp(1i*(kxx*X((n-1)*2 + 1, i) + kyy*X((n-1)*2 + 2, i)));
-        x1 = Xh.*projx;
-        x2 = Xh.*projy;
-        Px((n-1)*2 + 1,:) = x1(:).';
-        Px((n-1)*2 + 2,:) = x2(:).';
-    end
+   for n = 1:Ltracers
+        Xh = exp(1i * (kxx * X((n-1)*2 + 1, i) + kyy * X((n-1)*2 + 2, i)));
+        Px((n-1)*2 + 1, :) = reshape(Xh .* projx, 1, []);
+        Px((n-1)*2 + 2, :) = reshape(Xh .* projy, 1, []);
 
-    % QG Dynamics Forecast for the ensemble
-    for j = 1:ensemble_size
-        q_next = QG_dynamics(reshape(X_ens(:, j), N, N), pin.dt, params);
-        X_ens(:, j) = q_next(:);
-    end
+          % QG Dynamics Forecast for the ensemble
+        for j = 1:ensemble_size
+            q_next = QG_dynamics(reshape(X_ens(:, j), N, N), pin.dt, params);
+            X_ens(:, j) = q_next(:);
+        end
+         % EnKF update
+        [X_ens, X_mean] = enkf_update(X_ens, dXdt(:, i), Px, pin.sigmax, ensemble_size, N);
 
-    % EnKF update
-    [X_ens, X_mean] = enkf_update(X_ens, dXdt(:, i), Px, pin.sigmax, ensemble_size, N);
+
+   end
+
+  
+
 
     % Save mean state at specified intervals
     if mod(i, nsavef) == 0
@@ -123,7 +117,7 @@ Xt = X(:, 1:nsavef:length(pin.tlen)); % Extract the true states at save interval
 
 % Create case string for saving data
 casestr = casename(pin.N, pin.Ltracers, pin.sigmax, pin.Tend, pin.spectrum_type, pin.damping_type, pin.dtsave);
-datafolder = fullfile(pin.datafolder, casestr); % Define data folder path
+datafolder = fullfile(pin.datafolder, casestr); 
 
 % Save data if specified
 if pin.fsavedata && ~isfolder(datafolder)
@@ -196,7 +190,7 @@ function q_next = QG_dynamics(q, dt, params)
 end
 
 function [X_ens, X_mean] = enkf_update(X_ens, dXdt_i, Px, sigmax, ensemble_size, N)
-    % EnKF update step
+
     X_mean = mean(X_ens, 2);  % Mean of the ensemble
     X_prime = X_ens - X_mean; % Deviations from the mean
     C = (X_prime * X_prime') / (ensemble_size - 1); % Ensemble covariance
@@ -249,6 +243,7 @@ function [u, v] = interpolate_velocity(streamfunction, x, y, N)
     % Compute velocities
     u = -psi_y;
     v = psi_x;
+
 end
 
 

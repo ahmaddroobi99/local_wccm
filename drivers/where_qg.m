@@ -121,7 +121,7 @@ X = cell2mat(pin.X);
 dXdt = [(X(:,2)-X(:,1)) (X(:,2:end) - X(:,1:end-1))]./dt;
 
 % Initialize ensembles
-num_ensembles = 15;
+num_ensembles = 20;
 ensembles = randn(N*N, num_ensembles); % Initial ensembles
 % Ensemble mean
 mean_ensemble = mean(ensembles, 2);

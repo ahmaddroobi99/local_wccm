@@ -11,8 +11,8 @@
     nt = length(t);
     Ntruth =  dataext.params.N;
 
-    Ltracers = 20;
-    sigmax = 0.01;
+    Ltracers = 10;
+    sigmax = 0.1;
 
     obsdatafile = dir(fullfile(sprintf('obs_Ltracers%i_sigmax%.2g.mat', Ltracers, sigmax)));
     if isempty(obsdatafile)
@@ -22,7 +22,9 @@
     obsdata = load(fullfile(obsdatafile.folder,obsdatafile.name));
     % pin.Tend = t(end);
 
-    pin.Tend = 30;
+    % pin.Tend = 30;
+        pin.Tend = t(end);
+
     pin.nt=pin.Tend\dt;
     pin.Ltracers = Ltracers;
     pin.N = 16; % Grid points in each dimension (must be even)
@@ -53,7 +55,7 @@
 
     timer = tic;
     display("WHY filter begins");
-    [pin, m, Xt] = where(pin);
+    [pin, m, Xt] = WHY_PF(pin);
     display("filter ends");
     fprintf('filter runtime  %s\n', time2str(toc(timer)));
     

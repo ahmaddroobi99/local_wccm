@@ -1,19 +1,11 @@
-# local_wccm
+# local_wccm — barotropic Lagrangian filter (MATLAB)
 
-Original MATLAB project repository (2024).
+Public MATLAB working copy of the **barotropic Lagrangian data-assimilation** solver used during the MSc.
 
-This repository is **original work** on this account. It is kept for provenance.
+`lagrangianfilter_baro.m` integrates Lagrangian tracers and a filter on a barotropic spectral model (`q` / streamfunction / vorticity). Drivers generate synthetic barotropic observations, coarsen vorticity, run the filter, and plot omnidirectional spectra.
 
-It is **not** current research. Featured work:
+This is research code, not a GUI. The browser lab is [qg-lada-lab](https://github.com/ahmaddroobi99/qg-lada-lab). Private thesis sources stay private.
 
-- [qg-lada-lab](https://github.com/ahmaddroobi99/qg-lada-lab) — QG Lagrangian data assimilation
-- [ai-perception-lab](https://github.com/ahmaddroobi99/ai-perception-lab) — computer vision lab
-- Profile: [github.com/ahmaddroobi99](https://github.com/ahmaddroobi99)
+---
+MSc-period work (University of Calgary, 2024). Not the public lab — see [qg-lada-lab](https://github.com/ahmaddroobi99/qg-lada-lab) for the public QG DA demo.
 
-## Language
-
-MATLAB
-
-## Year
-
-2024

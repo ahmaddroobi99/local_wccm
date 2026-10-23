@@ -5,7 +5,7 @@
 function generate_figures(folder,recursive)
 
 if nargin < 1
-    folder = 'figs'; % by default assume figs is the default folder anme
+    folder = 'figs'; % by default assume figs is the default folder name
     if ~isfolder(folder)
         folder = '.'; % if figs is not the default folder assume the current working directory is the default folder
     end

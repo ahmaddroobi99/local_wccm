@@ -1,1 +1,0 @@
-openExample('matlab/Plot3DSurfaceExample')

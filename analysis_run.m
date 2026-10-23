@@ -1,6 +1,6 @@
 %-------------------------------------------------------------------------%
 % load all .mat files in `datafolder` and run the analysis function on the
-% datas
+% data
 %-------------------------------------------------------------------------%
 
 close all;

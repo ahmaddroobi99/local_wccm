@@ -65,7 +65,7 @@ for ii=1:Nens
     X(1,:,ii) = [normrnd(0,0.3),normrnd(0,0.3),normrnd(0,0.3)];
 end
 
-% begin propogating ensemble
+% begin propagating ensemble
 for ii=2:Nt
     %disp(ii/Nt);
     % solve each ensemble member to the next time
